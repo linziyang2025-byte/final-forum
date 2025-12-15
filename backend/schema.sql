@@ -1,0 +1,26 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS topics (
+                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                      name TEXT NOT NULL,
+                                      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+                                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                     topic_id INTEGER NOT NULL,
+                                     title TEXT NOT NULL,
+                                     content TEXT NOT NULL,
+                                     author TEXT NOT NULL,
+                                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                     FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+    );
+
+CREATE TABLE IF NOT EXISTS comments (
+                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        post_id INTEGER NOT NULL,
+                                        content TEXT NOT NULL,
+                                        author TEXT NOT NULL,
+                                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+    );
