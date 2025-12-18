@@ -80,7 +80,7 @@ export default function PostsPage() {
 
             <ul>
                 {posts.map((p) => (
-                    <li key={p.id} style={{ marginBottom: 10 }}>
+                    <li key={p.id} className="card">
                         <Link to={`/posts/${p.id}`} style={{ marginRight: 12 }}>
                             {p.title}
                         </Link>

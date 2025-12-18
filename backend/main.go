@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +20,7 @@ import (
 type Topic struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
+	Author    string `json:"author"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -35,6 +39,11 @@ type Comment struct {
 	Content   string `json:"content"`
 	Author    string `json:"author"`
 	CreatedAt string `json:"createdAt"`
+}
+
+type AuthInfo struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func mustOpenDB(path string) *sql.DB {
@@ -60,27 +69,18 @@ func mustApplySchema(db *sql.DB, schema string) {
 
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User")
+		// If you use cookie sessions, you MUST allow credentials and cannot use '*'.
+		origin := r.Header.Get("Origin")
+		if origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// 检测非空header（还得是X-User）
-func checkAuthor(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "OPTIONS" || r.Method == "GET" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		au := strings.TrimSpace(r.Header.Get("X-User"))
-		if au == "" {
-			http.Error(w, "missing X-User header", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -108,7 +108,7 @@ func getID(r *http.Request, key string) (int, error) {
 
 func listTopics(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query(`SELECT id, name, created_at FROM topics ORDER BY id DESC`)
+		rows, err := db.Query(`SELECT id, name, author, created_at FROM topics ORDER BY id DESC`)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -118,7 +118,7 @@ func listTopics(db *sql.DB) http.HandlerFunc {
 		out := []Topic{}
 		for rows.Next() {
 			var t Topic
-			if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt); err != nil {
+			if err := rows.Scan(&t.ID, &t.Name, &t.Author, &t.CreatedAt); err != nil {
 				http.Error(w, err.Error(), 500)
 				return
 			}
@@ -130,6 +130,12 @@ func listTopics(db *sql.DB) http.HandlerFunc {
 
 func createTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+		user = strings.TrimSpace(user)
+
 		var in struct {
 			Name string `json:"name"`
 		}
@@ -142,25 +148,48 @@ func createTopic(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "name required", 400)
 			return
 		}
-		res, err := db.Exec(`INSERT INTO topics(name) VALUES (?)`, in.Name)
+
+		res, err := db.Exec(`INSERT INTO topics(name, author) VALUES (?, ?)`, in.Name, user)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 		id64, _ := res.LastInsertId()
 		writeJSON(w, 201, map[string]any{
-			"id": int(id64), "name": in.Name,
+			"id":     int(id64),
+			"name":   in.Name,
+			"author": user,
 		})
 	}
 }
 
 func updateTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		topicID, err := getID(r, "topicID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM topics WHERE id = ?`, topicID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "topic not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		var in struct {
 			Name string `json:"name"`
 		}
@@ -184,11 +213,31 @@ func updateTopic(db *sql.DB) http.HandlerFunc {
 
 func deleteTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		topicID, err := getID(r, "topicID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM topics WHERE id = ?`, topicID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "topic not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		_, err = db.Exec(`DELETE FROM topics WHERE id = ?`, topicID)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
@@ -234,7 +283,12 @@ func createPost(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		user := strings.TrimSpace(r.Header.Get("X-User"))
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+		user = strings.TrimSpace(user)
+
 		var in struct {
 			Title   string `json:"title"`
 			Content string `json:"content"`
@@ -283,11 +337,31 @@ func getPost(db *sql.DB) http.HandlerFunc {
 
 func updatePost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		postID, err := getID(r, "postID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "post not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		var in struct {
 			Title   string `json:"title"`
 			Content string `json:"content"`
@@ -313,11 +387,31 @@ func updatePost(db *sql.DB) http.HandlerFunc {
 
 func deletePost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		postID, err := getID(r, "postID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "post not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		if _, err := db.Exec(`DELETE FROM posts WHERE id = ?`, postID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -362,7 +456,11 @@ func createComment(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		user := strings.TrimSpace(r.Header.Get("X-User"))
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+		user = strings.TrimSpace(user)
 
 		var in struct {
 			Content string `json:"content"`
@@ -388,11 +486,31 @@ func createComment(db *sql.DB) http.HandlerFunc {
 
 func updateComment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		commentID, err := getID(r, "commentID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "comment not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		var in struct {
 			Content string `json:"content"`
 		}
@@ -416,17 +534,190 @@ func updateComment(db *sql.DB) http.HandlerFunc {
 
 func deleteComment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
 		commentID, err := getID(r, "commentID")
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		var owner string
+		err = db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner)
+		if err == sql.ErrNoRows {
+			http.Error(w, "comment not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
 		if _, err := db.Exec(`DELETE FROM comments WHERE id = ?`, commentID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+var sessions = map[string]string{}
+
+func newSessionID() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func register(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in AuthInfo
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		in.Username = strings.TrimSpace(in.Username)
+		if in.Username == "" || len(in.Password) < 6 {
+			http.Error(w, "invalid username or password", 400)
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		_, err = db.Exec(`INSERT INTO users(username, password_hash) VALUES (?, ?)`, in.Username, string(hash))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		w.WriteHeader(201)
+		_ = json.NewEncoder(w).Encode(map[string]string{"username": in.Username})
+	}
+}
+
+func login(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in AuthInfo
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		in.Username = strings.TrimSpace(in.Username)
+
+		var hash string
+		err := db.QueryRow(`SELECT password_hash FROM users WHERE username = ?`, in.Username).Scan(&hash)
+		if err != nil {
+			http.Error(w, "invalid username or password", 401)
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)); err != nil {
+			http.Error(w, "invalid username or password", 401)
+			return
+		}
+
+		sid, err := newSessionID()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		sessions[sid] = in.Username
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    sid,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+
+		_ = json.NewEncoder(w).Encode(map[string]string{"username": in.Username})
+	}
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie("session")
+	if err == nil {
+		delete(sessions, c.Value)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	w.WriteHeader(204)
+}
+
+func authMe(w http.ResponseWriter, r *http.Request) {
+	u, ok := currentUser(r)
+	if !ok || strings.TrimSpace(u) == "" {
+		http.Error(w, "not logged in", http.StatusUnauthorized)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{"username": u})
+}
+
+func isMe(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie("session")
+	if err != nil {
+		http.Error(w, "not logged in", 401)
+		return
+	}
+	u, ok := sessions[c.Value]
+	if !ok {
+		http.Error(w, "not logged in", 401)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{"username": u})
+}
+
+func currentUser(r *http.Request) (string, bool) {
+	c, err := r.Cookie("session")
+	if err != nil {
+		return "", false
+	}
+	u, ok := sessions[c.Value]
+	return u, ok
+}
+
+func mustUser(w http.ResponseWriter, r *http.Request) (string, bool) {
+	u, ok := currentUser(r)
+	if !ok || strings.TrimSpace(u) == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return "", false
+	}
+	return u, true
+}
+
+func requireLogin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" || r.Method == "OPTIONS" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if _, ok := currentUser(r); !ok {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ----------------main------------------
@@ -438,25 +729,36 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(withCORS)
-	r.Use(checkAuthor)
-	//topic
-	r.Get("/api/topics", listTopics(db))
-	r.Post("/api/topics", createTopic(db))
-	r.Put("/api/topics/{topicID}", updateTopic(db))
-	r.Delete("/api/topics/{topicID}", deleteTopic(db))
-	//post
-	r.Get("/api/topics/{topicID}/posts", listPosts(db))
-	r.Post("/api/topics/{topicID}/posts", createPost(db))
-	//特定 post
-	r.Get("/api/posts/{postID}", getPost(db))
-	r.Put("/api/posts/{postID}", updatePost(db))
-	r.Delete("/api/posts/{postID}", deletePost(db))
-	//comment
-	r.Get("/api/posts/{postID}/comments", listComments(db))
-	r.Post("/api/posts/{postID}/comments", createComment(db))
-	//特定 comment
-	r.Put("/api/comments/{commentID}", updateComment(db))
-	r.Delete("/api/comments/{commentID}", deleteComment(db))
+
+	// ---------- Auth (no login required) ----------
+	r.Post("/auth/register", register(db))
+	r.Post("/auth/login", login(db))
+	r.Post("/auth/logout", logout)
+	r.Get("/auth/me", authMe)
+
+	// ---------- API (login required for non-GET) ----------
+	r.Route("/api", func(api chi.Router) {
+		api.Use(requireLogin)
+
+		// topics
+		api.Get("/topics", listTopics(db))
+		api.Post("/topics", createTopic(db))
+		api.Put("/topics/{topicID}", updateTopic(db))
+		api.Delete("/topics/{topicID}", deleteTopic(db))
+
+		// posts
+		api.Get("/topics/{topicID}/posts", listPosts(db))
+		api.Post("/topics/{topicID}/posts", createPost(db))
+		api.Get("/posts/{postID}", getPost(db))
+		api.Put("/posts/{postID}", updatePost(db))
+		api.Delete("/posts/{postID}", deletePost(db))
+
+		// comments
+		api.Get("/posts/{postID}/comments", listComments(db))
+		api.Post("/posts/{postID}/comments", createComment(db))
+		api.Put("/comments/{commentID}", updateComment(db))
+		api.Delete("/comments/{commentID}", deleteComment(db))
+	})
 
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))

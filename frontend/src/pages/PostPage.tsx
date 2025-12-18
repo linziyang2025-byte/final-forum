@@ -129,14 +129,19 @@ export default function PostPage() {
 
             <ul style={{ marginTop: 12 }}>
                 {comments.map((c) => (
-                    <li key={c.id} style={{ marginBottom: 10 }}>
-                        {c.content}{" "}
-                        <button onClick={() => onEditComment(c)} style={{ marginLeft: 8 }}>
-                            Edit
-                        </button>
-                        <button onClick={() => onDeleteComment(c)} style={{ marginLeft: 6 }}>
-                            Delete
-                        </button>
+                    <li key={c.id} className="card">
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                            {c.author ?? "Anonymous"}
+                        </div>
+                        <div>
+                            {c.content}
+                        </div>
+                        <div style={{ marginTop: 8 }}>
+                            <button onClick={() => onEditComment(c)}>Edit</button>
+                            <button onClick={() => onDeleteComment(c)} style={{ marginLeft: 6 }}>
+                                Delete
+                            </button>
+                        </div>
                     </li>
                 ))}
             </ul>

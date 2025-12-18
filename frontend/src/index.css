@@ -24,8 +24,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
+  display: block;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -34,6 +33,21 @@ h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+
+.card {
+  border: 1px solid #999;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: #fff;
+}
+
 
 button {
   border-radius: 8px;

@@ -1,28 +1,50 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth";
 
 export default function Header() {
-    const [user, setUser] = useState(
-        localStorage.getItem("x_user") ?? ""
-    );
+    const { username, logout } = useAuth();
+    const nav = useNavigate();
+
+    async function onLogout() {
+        try {
+            await logout();
+            nav("/login");
+        } catch {
+            nav("/login");
+        }
+    }
 
     return (
         <div style={{ padding: 12, borderBottom: "1px solid #ddd" }}>
-            <Link to="/topics" style={{ fontWeight: "bold", marginRight: 16 }}>
-                Forum
-            </Link>
-
-            <input
-                value={user}
-                onChange={(e) => setUser(e.target.value)}
-                placeholder="Username"
-            />
-            <button
-                onClick={() => localStorage.setItem("x_user", user)}
-                style={{ marginLeft: 8 }}
+            <div
+                style={{
+                    maxWidth: 1000,
+                    margin: "0 auto",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                }}
             >
-                Save
-            </button>
+                <Link
+                    to="/topics"
+                    style={{ fontWeight: "bold", marginRight: 16, color: "black", textDecoration: "none" }}
+                >
+                    Forum
+                </Link>
+
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+                    {username ? (
+                        <>
+              <span>
+                Logged in as <b>{username}</b>
+              </span>
+                            <button onClick={onLogout}>Logout</button>
+                        </>
+                    ) : (
+                        <Link to="/login">Login</Link>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

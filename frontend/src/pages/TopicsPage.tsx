@@ -76,7 +76,7 @@ export default function TopicsPage() {
 
             <ul>
                 {topics.map((t) => (
-                    <li key={t.id} style={{ marginBottom: 8 }}>
+                    <li key={t.id} className="card">
                         <Link to={`/topics/${t.id}/posts`} style={{ marginRight: 12 }}>
                             {t.name}
                         </Link>

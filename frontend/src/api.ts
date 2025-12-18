@@ -1,9 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
 
-function getUser(): string {
-    return localStorage.getItem("x_user")?.trim() ?? "";
-}
-
 async function request<T>(
     path: string,
     options: RequestInit = {}
@@ -12,14 +8,7 @@ async function request<T>(
     const headers = new Headers(options.headers ?? {});
     headers.set("Content-Type", "application/json");
 
-    const method = (options.method ?? "GET").toUpperCase();
-    if (method !== "GET" && method !== "OPTIONS") {
-        const user = getUser();
-        if (!user) throw new Error("Please set X-User first");
-        headers.set("X-User", user);
-    }
-
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, credentials: "include",});
 
     if (res.status === 204) return undefined as T;
 
@@ -43,16 +32,23 @@ async function request<T>(
     }
 
     return data as T;
-
-
-    if (!res.ok) {
-        throw new Error(data?.message ?? text ?? "Request failed");
-    }
-
-    return data as T;
 }
 
 export const api = {
+    // auth
+    me: () => request<{ username: string }>("/auth/me"),
+    login: (username: string, password: string) =>
+        request<{ username: string }>("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ username, password }),
+        }),
+    register: (username: string, password: string) =>
+        request<{ username: string }>("/auth/register", {
+            method: "POST",
+            body: JSON.stringify({ username, password }),
+        }),
+    logout: () => request<void>("/auth/logout", { method: "POST" }),
+
     // topics
     listTopics: () => request<any[]>("/api/topics"),
     createTopic: (name: string) =>
