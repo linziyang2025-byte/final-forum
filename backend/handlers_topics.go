@@ -1,0 +1,144 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"strings"
+)
+
+func listTopics(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.Query(`SELECT id, name, author, created_at FROM topics ORDER BY id DESC`)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		defer rows.Close()
+
+		var out []Topic
+		for rows.Next() {
+			var t Topic
+			if err := rows.Scan(&t.ID, &t.Name, &t.Author, &t.CreatedAt); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			out = append(out, t)
+		}
+		writeJSON(w, 200, out)
+	}
+}
+
+func createTopic(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+		user = strings.TrimSpace(user)
+
+		var in struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "invalid json", 400)
+			return
+		}
+		in.Name = strings.TrimSpace(in.Name)
+		if in.Name == "" {
+			http.Error(w, "name required", 400)
+			return
+		}
+
+		res, err := db.Exec(`INSERT INTO topics(name, author) VALUES (?, ?)`, in.Name, user)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		id64, _ := res.LastInsertId()
+		writeJSON(w, 201, map[string]interface{}{"id": id64})
+	}
+}
+
+func updateTopic(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
+		id, err := getID(r, "topicID")
+		if err != nil {
+			http.Error(w, "invalid id", 400)
+			return
+		}
+
+		var owner string
+		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
+			if errorsIs(err, sql.ErrNoRows) {
+				http.Error(w, "not found", 404)
+				return
+			}
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
+		var in struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			http.Error(w, "invalid json", 400)
+			return
+		}
+		in.Name = strings.TrimSpace(in.Name)
+		if in.Name == "" {
+			http.Error(w, "name required", 400)
+			return
+		}
+
+		if _, err := db.Exec(`UPDATE topics SET name = ? WHERE id = ?`, in.Name, id); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.WriteHeader(204)
+	}
+}
+
+func deleteTopic(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := mustUser(w, r)
+		if !ok {
+			return
+		}
+
+		id, err := getID(r, "topicID")
+		if err != nil {
+			http.Error(w, "invalid id", 400)
+			return
+		}
+
+		var owner string
+		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
+			if errorsIs(err, sql.ErrNoRows) {
+				http.Error(w, "not found", 404)
+				return
+			}
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if owner != user {
+			http.Error(w, "forbidden", 403)
+			return
+		}
+
+		if _, err := db.Exec(`DELETE FROM topics WHERE id = ?`, id); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.WriteHeader(204)
+	}
+}
