@@ -1,13 +1,17 @@
-package main
+package handlers
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"final-forum/internal/api"
+	"final-forum/internal/models"
+	"final-forum/internal/router"
 )
 
-func listTopics(db *sql.DB) http.HandlerFunc {
+func ListTopics(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(`SELECT id, name, author, created_at FROM topics ORDER BY id DESC`)
 		if err != nil {
@@ -16,22 +20,22 @@ func listTopics(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var out []Topic
+		var out []models.Topic
 		for rows.Next() {
-			var t Topic
+			var t models.Topic
 			if err := rows.Scan(&t.ID, &t.Name, &t.Author, &t.CreatedAt); err != nil {
 				http.Error(w, err.Error(), 500)
 				return
 			}
 			out = append(out, t)
 		}
-		writeJSON(w, 200, out)
+		api.WriteJSON(w, 200, out)
 	}
 }
 
-func createTopic(db *sql.DB) http.HandlerFunc {
+func CreateTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
@@ -56,18 +60,18 @@ func createTopic(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		id64, _ := res.LastInsertId()
-		writeJSON(w, 201, map[string]interface{}{"id": id64})
+		api.WriteJSON(w, 201, map[string]interface{}{"id": id64})
 	}
 }
 
-func updateTopic(db *sql.DB) http.HandlerFunc {
+func UpdateTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		id, err := getID(r, "topicID")
+		id, err := api.GetID(r, "topicID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -75,14 +79,14 @@ func updateTopic(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}
@@ -108,14 +112,14 @@ func updateTopic(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func deleteTopic(db *sql.DB) http.HandlerFunc {
+func DeleteTopic(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		id, err := getID(r, "topicID")
+		id, err := api.GetID(r, "topicID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -123,14 +127,14 @@ func deleteTopic(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}

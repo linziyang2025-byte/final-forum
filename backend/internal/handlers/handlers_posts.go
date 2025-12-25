@@ -1,15 +1,19 @@
-package main
+package handlers
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"final-forum/internal/api"
+	"final-forum/internal/models"
+	"final-forum/internal/router"
 )
 
-func listPosts(db *sql.DB) http.HandlerFunc {
+func ListPosts(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		topicID, err := getID(r, "topicID")
+		topicID, err := api.GetID(r, "topicID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -22,28 +26,28 @@ func listPosts(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var out []Post
+		var out []models.Post
 		for rows.Next() {
-			var p Post
+			var p models.Post
 			if err := rows.Scan(&p.ID, &p.TopicID, &p.Title, &p.Content, &p.Author, &p.CreatedAt); err != nil {
 				http.Error(w, err.Error(), 500)
 				return
 			}
 			out = append(out, p)
 		}
-		writeJSON(w, 200, out)
+		api.WriteJSON(w, 200, out)
 	}
 }
 
-func createPost(db *sql.DB) http.HandlerFunc {
+func CreatePost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 		user = strings.TrimSpace(user)
 
-		topicID, err := getID(r, "topicID")
+		topicID, err := api.GetID(r, "topicID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -70,41 +74,41 @@ func createPost(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		id64, _ := res.LastInsertId()
-		writeJSON(w, 201, map[string]interface{}{"id": id64})
+		api.WriteJSON(w, 201, map[string]interface{}{"id": id64})
 	}
 }
 
-func getPost(db *sql.DB) http.HandlerFunc {
+func GetPost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		postID, err := getID(r, "postID")
+		postID, err := api.GetID(r, "postID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
 		}
 
-		var p Post
+		var p models.Post
 		err = db.QueryRow(`SELECT id, topic_id, title, content, author, created_at FROM posts WHERE id = ?`, postID).
 			Scan(&p.ID, &p.TopicID, &p.Title, &p.Content, &p.Author, &p.CreatedAt)
 		if err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		writeJSON(w, 200, p)
+		api.WriteJSON(w, 200, p)
 	}
 }
 
-func updatePost(db *sql.DB) http.HandlerFunc {
+func UpdatePost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		postID, err := getID(r, "postID")
+		postID, err := api.GetID(r, "postID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -112,14 +116,14 @@ func updatePost(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}
@@ -147,14 +151,14 @@ func updatePost(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func deletePost(db *sql.DB) http.HandlerFunc {
+func DeletePost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		postID, err := getID(r, "postID")
+		postID, err := api.GetID(r, "postID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -162,14 +166,14 @@ func deletePost(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}

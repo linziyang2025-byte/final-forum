@@ -1,15 +1,19 @@
-package main
+package handlers
 
 import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"final-forum/internal/api"
+	"final-forum/internal/models"
+	"final-forum/internal/router"
 )
 
-func listComments(db *sql.DB) http.HandlerFunc {
+func ListComments(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		postID, err := getID(r, "postID")
+		postID, err := api.GetID(r, "postID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -22,28 +26,28 @@ func listComments(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var out []Comment
+		var out []models.Comment
 		for rows.Next() {
-			var c Comment
+			var c models.Comment
 			if err := rows.Scan(&c.ID, &c.PostID, &c.Content, &c.Author, &c.CreatedAt); err != nil {
 				http.Error(w, err.Error(), 500)
 				return
 			}
 			out = append(out, c)
 		}
-		writeJSON(w, 200, out)
+		api.WriteJSON(w, 200, out)
 	}
 }
 
-func createComment(db *sql.DB) http.HandlerFunc {
+func CreateComment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 		user = strings.TrimSpace(user)
 
-		postID, err := getID(r, "postID")
+		postID, err := api.GetID(r, "postID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -68,18 +72,18 @@ func createComment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		id64, _ := res.LastInsertId()
-		writeJSON(w, 201, map[string]interface{}{"id": id64})
+		api.WriteJSON(w, 201, map[string]interface{}{"id": id64})
 	}
 }
 
-func updateComment(db *sql.DB) http.HandlerFunc {
+func UpdateComment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		commentID, err := getID(r, "commentID")
+		commentID, err := api.GetID(r, "commentID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -87,14 +91,14 @@ func updateComment(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}
@@ -120,14 +124,14 @@ func updateComment(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func deleteComment(db *sql.DB) http.HandlerFunc {
+func DeleteComment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := mustUser(w, r)
+		user, ok := router.MustUser(w, r)
 		if !ok {
 			return
 		}
 
-		commentID, err := getID(r, "commentID")
+		commentID, err := api.GetID(r, "commentID")
 		if err != nil {
 			http.Error(w, "invalid id", 400)
 			return
@@ -135,14 +139,14 @@ func deleteComment(db *sql.DB) http.HandlerFunc {
 
 		var owner string
 		if err := db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner); err != nil {
-			if errorsIs(err, sql.ErrNoRows) {
+			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
 			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if owner != user {
+		if strings.TrimSpace(owner) != strings.TrimSpace(user) {
 			http.Error(w, "forbidden", 403)
 			return
 		}

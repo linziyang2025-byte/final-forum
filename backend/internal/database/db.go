@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func mustOpenDB(path string) *sql.DB {
+func OpenDB(path string) *sql.DB {
 	db, err := sql.Open("sqlite3", path+"?_foreign_keys=on")
 	if err != nil {
 		log.Fatal(err)
@@ -19,8 +19,8 @@ func mustOpenDB(path string) *sql.DB {
 	return db
 }
 
-func mustApplySchema(db *sql.DB, schema string) {
-	b, err := os.ReadFile(schema)
+func ApplySchema(db *sql.DB, schemaPath string) {
+	b, err := os.ReadFile(schemaPath)
 	if err != nil {
 		log.Fatal(err)
 	}

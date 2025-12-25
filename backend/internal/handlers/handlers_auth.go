@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"database/sql"
@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"strings"
 
+	"final-forum/internal/api"
+	"final-forum/internal/models"
+	"final-forum/internal/router"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
-func register(db *sql.DB) http.HandlerFunc {
+func Register(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var in AuthInfo
+		var in models.AuthInfo
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -42,9 +46,9 @@ func register(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func login(db *sql.DB) http.HandlerFunc {
+func Login(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var in AuthInfo
+		var in models.AuthInfo
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -66,12 +70,12 @@ func login(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		sid, err := newSessionID()
+		sid, err := api.NewSessionID()
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		sessions[sid] = in.Username
+		router.SetSession(sid, in.Username)
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session",
@@ -84,10 +88,10 @@ func login(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func logout(w http.ResponseWriter, r *http.Request) {
+func Logout(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session")
 	if err == nil {
-		delete(sessions, c.Value)
+		router.DeleteSession(c.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -101,17 +105,17 @@ func logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-func authMe(w http.ResponseWriter, r *http.Request) {
-	u, ok := currentUser(r)
+func AuthMe(w http.ResponseWriter, r *http.Request) {
+	u, ok := router.CurrentUser(r)
 	if !ok {
-		writeJSON(w, 200, map[string]interface{}{"username": ""})
+		api.WriteJSON(w, 200, map[string]interface{}{"username": ""})
 		return
 	}
-	writeJSON(w, 200, map[string]interface{}{"username": u})
+	api.WriteJSON(w, 200, map[string]interface{}{"username": u})
 }
 
-func isMe(w http.ResponseWriter, r *http.Request) {
-	user, ok := mustUser(w, r)
+func IsMe(w http.ResponseWriter, r *http.Request) {
+	user, ok := router.MustUser(w, r)
 	if !ok {
 		return
 	}
@@ -124,5 +128,5 @@ func isMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Username = strings.TrimSpace(in.Username)
-	writeJSON(w, 200, map[string]interface{}{"ok": in.Username == user})
+	api.WriteJSON(w, 200, map[string]interface{}{"ok": in.Username == user})
 }
