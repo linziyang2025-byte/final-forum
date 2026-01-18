@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { api } from "../api"
+import { api } from "../api";
 import { useAuth } from "../auth";
-
 
 export default function LoginPage() {
     const nav = useNavigate();
@@ -27,31 +26,35 @@ export default function LoginPage() {
             <h2>Login</h2>
             {err && <div style={{ color: "crimson", marginBottom: 12 }}>{err}</div>}
 
-            <form className="card" onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
+            <form
+                className="card"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    onLogin();
+                }}
+            >
                 <div style={{ marginBottom: 10 }}>
                     <input
                         value={username}
-                        onBlur={(e) => setUsername(e.currentTarget.value)}
-                        onChange={(e) => setUsername(e.currentTarget.value)}
-                        onInput={(e: React.FormEvent<HTMLInputElement>) => setUsername(e.currentTarget.value)}
+                        onChange={(e) => setUsername(e.target.value)}
+                        onInput={(e) => setUsername((e.target as HTMLInputElement).value)}
                         placeholder="Username"
+                        autoComplete="username"
                     />
                 </div>
 
                 <div style={{ marginBottom: 10 }}>
                     <input
                         value={password}
-                        onBlur={(e) => setPassword(e.currentTarget.value)}
-                        onChange={(e) => setPassword(e.currentTarget.value)}
-                        onInput={(e: React.FormEvent<HTMLInputElement>) => setPassword(e.currentTarget.value)}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
                         placeholder="Password"
                         type="password"
+                        autoComplete="current-password"
                     />
                 </div>
 
-                <button type="submit" disabled={!username.trim() || !password}>
-                    Login
-                </button>
+                <button type="submit">Login</button>
 
                 <div style={{ marginTop: 10 }}>
                     No account? <Link to="/register">Register</Link>

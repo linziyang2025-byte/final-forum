@@ -1,16 +1,17 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const API_BASE = "";
 
-async function request<T>(
-    path: string,
-    options: RequestInit = {}
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE}${path}`;
     const headers = new Headers(options.headers ?? {});
     headers.set("Content-Type", "application/json");
 
-    const res = await fetch(url, { ...options, headers, credentials: "include",});
+    const res = await fetch(url, {
+        ...options,
+        headers,
+        credentials: "include",
+    });
 
-    if (res.status === 204) return ([] as unknown) as T;
+    if (res.status === 204) return undefined as T;
 
     const text = await res.text();
 
@@ -35,21 +36,19 @@ async function request<T>(
 }
 
 export const api = {
-    // auth
     me: () => request<{ username: string }>("/auth/me"),
     login: (username: string, password: string) =>
-        request<{ username: string }>("/auth/login", {
+        request<void>("/auth/login", {
             method: "POST",
             body: JSON.stringify({ username, password }),
         }),
     register: (username: string, password: string) =>
-        request<{ username: string }>("/auth/register", {
+        request<void>("/auth/register", {
             method: "POST",
             body: JSON.stringify({ username, password }),
         }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
 
-    // topics
     listTopics: () => request<any[]>("/api/topics"),
     createTopic: (name: string) =>
         request("/api/topics", {
@@ -61,30 +60,23 @@ export const api = {
             method: "PUT",
             body: JSON.stringify({ name }),
         }),
-    deleteTopic: (id: number) =>
-        request(`/api/topics/${id}`, { method: "DELETE" }),
+    deleteTopic: (id: number) => request(`/api/topics/${id}`, { method: "DELETE" }),
 
-    // posts
-    listPosts: (topicID: number) =>
-        request<any[]>(`/api/topics/${topicID}/posts`),
+    listPosts: (topicID: number) => request<any[]>(`/api/topics/${topicID}/posts`),
     createPost: (topicID: number, title: string, content: string) =>
         request(`/api/topics/${topicID}/posts`, {
             method: "POST",
             body: JSON.stringify({ title, content }),
         }),
-    getPost: (postID: number) =>
-        request(`/api/posts/${postID}`),
+    getPost: (postID: number) => request(`/api/posts/${postID}`),
     updatePost: (postID: number, title: string, content: string) =>
         request(`/api/posts/${postID}`, {
             method: "PUT",
             body: JSON.stringify({ title, content }),
         }),
-    deletePost: (postID: number) =>
-        request(`/api/posts/${postID}`, { method: "DELETE" }),
+    deletePost: (postID: number) => request(`/api/posts/${postID}`, { method: "DELETE" }),
 
-    // comments
-    listComments: (postID: number) =>
-        request<any[]>(`/api/posts/${postID}/comments`),
+    listComments: (postID: number) => request<any[]>(`/api/posts/${postID}/comments`),
     createComment: (postID: number, content: string) =>
         request(`/api/posts/${postID}/comments`, {
             method: "POST",
