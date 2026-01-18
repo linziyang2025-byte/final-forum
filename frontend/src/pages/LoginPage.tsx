@@ -31,8 +31,9 @@ export default function LoginPage() {
                 <div style={{ marginBottom: 10 }}>
                     <input
                         value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        onInput={(e) => setUsername((e.target as HTMLInputElement).value)}
+                        onBlur={(e) => setUsername(e.currentTarget.value)}
+                        onChange={(e) => setUsername(e.currentTarget.value)}
+                        onInput={(e: React.FormEvent<HTMLInputElement>) => setUsername(e.currentTarget.value)}
                         placeholder="Username"
                     />
                 </div>
@@ -40,8 +41,9 @@ export default function LoginPage() {
                 <div style={{ marginBottom: 10 }}>
                     <input
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+                        onBlur={(e) => setPassword(e.currentTarget.value)}
+                        onChange={(e) => setPassword(e.currentTarget.value)}
+                        onInput={(e: React.FormEvent<HTMLInputElement>) => setPassword(e.currentTarget.value)}
                         placeholder="Password"
                         type="password"
                     />
