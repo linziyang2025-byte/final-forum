@@ -27,7 +27,7 @@ export default function LoginPage() {
             <h2>Login</h2>
             {err && <div style={{ color: "crimson", marginBottom: 12 }}>{err}</div>}
 
-            <div className="card">
+            <form className="card" onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
                 <div style={{ marginBottom: 10 }}>
                     <input
                         value={username}
@@ -45,14 +45,15 @@ export default function LoginPage() {
                     />
                 </div>
 
-                <button onClick={onLogin} disabled={!username.trim() || !password}>
+                <button type="submit" disabled={!username.trim() || !password}>
                     Login
                 </button>
 
                 <div style={{ marginTop: 10 }}>
                     No account? <Link to="/register">Register</Link>
                 </div>
-            </div>
+            </form>
+
         </div>
     );
 }
