@@ -53,7 +53,6 @@ export default function LoginPage() {
                     No account? <Link to="/register">Register</Link>
                 </div>
             </form>
-
         </div>
     );
 }
