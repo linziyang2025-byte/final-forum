@@ -12,7 +12,7 @@ export default function TopicsPage() {
         setErr("");
         try {
             const data = await api.listTopics();
-            setTopics(data);
+            setTopics(Array.isArray(data) ? data : []);
         } catch (e: any) {
             setErr(e.message ?? String(e));
         }

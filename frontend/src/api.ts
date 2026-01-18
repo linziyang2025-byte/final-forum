@@ -12,7 +12,7 @@ async function request<T>(
 
     const res = await fetch(url, { ...options, headers, credentials: "include",});
 
-    if (res.status === 204) return undefined as T;
+    if (res.status === 204) return ([] as unknown) as T;
 
     const text = await res.text();
 
