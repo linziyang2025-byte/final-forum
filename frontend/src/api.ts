@@ -1,4 +1,5 @@
-const API_BASE = "https://final-forum-tl7l.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+
 
 
 async function request<T>(
