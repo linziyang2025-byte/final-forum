@@ -79,10 +79,11 @@ func Login(db *sql.DB) http.HandlerFunc {
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session",
-			Value:    sid,
+			Value:    sid, // 你原来放的值
 			Path:     "/",
 			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
 		})
 		w.WriteHeader(204)
 	}
