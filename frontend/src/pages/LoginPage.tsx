@@ -32,6 +32,7 @@ export default function LoginPage() {
                     <input
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                        onInput={(e) => setUsername((e.target as HTMLInputElement).value)}
                         placeholder="Username"
                     />
                 </div>
@@ -40,6 +41,7 @@ export default function LoginPage() {
                     <input
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
                         placeholder="Password"
                         type="password"
                     />
