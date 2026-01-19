@@ -62,7 +62,6 @@ func Register(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 func Login(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var in models.AuthInfo
@@ -77,7 +76,7 @@ func Login(db *sql.DB) http.HandlerFunc {
 		}
 
 		var hash string
-		if err := db.QueryRow(`SELECT password_hash FROM users WHERE username = ?`, in.Username).Scan(&hash); err != nil {
+		if err := db.QueryRow(`SELECT password_hash FROM users WHERE username = $1`, in.Username).Scan(&hash); err != nil {
 			http.Error(w, "invalid username or password", 401)
 			return
 		}

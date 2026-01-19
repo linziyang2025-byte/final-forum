@@ -19,7 +19,7 @@ func ListComments(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.Query(`SELECT id, post_id, content, author, created_at FROM comments WHERE post_id = ? ORDER BY id ASC`, postID)
+		rows, err := db.Query(`SELECT id, post_id, content, author, created_at FROM comments WHERE post_id = $1 ORDER BY id ASC`, postID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -66,7 +66,7 @@ func CreateComment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec(`INSERT INTO comments(post_id, content, author) VALUES (?, ?, ?)`, postID, in.Content, user)
+		res, err := db.Exec(`INSERT INTO comments(post_id, content, author) VALUES ($1, $2, $3)`, postID, in.Content, user)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -90,7 +90,7 @@ func UpdateComment(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM comments WHERE id = $1`, commentID).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -116,7 +116,7 @@ func UpdateComment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`UPDATE comments SET content = ? WHERE id = ?`, in.Content, commentID); err != nil {
+		if _, err := db.Exec(`UPDATE comments SET content = $1 WHERE id = $2`, in.Content, commentID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -138,7 +138,7 @@ func DeleteComment(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM comments WHERE id = ?`, commentID).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM comments WHERE id = $1`, commentID).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -151,7 +151,7 @@ func DeleteComment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`DELETE FROM comments WHERE id = ?`, commentID); err != nil {
+		if _, err := db.Exec(`DELETE FROM comments WHERE id = $1`, commentID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

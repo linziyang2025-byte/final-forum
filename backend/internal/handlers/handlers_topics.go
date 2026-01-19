@@ -54,7 +54,7 @@ func CreateTopic(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec(`INSERT INTO topics(name, author) VALUES (?, ?)`, in.Name, user)
+		res, err := db.Exec(`INSERT INTO topics(name, author) VALUES ($1, $2)`, in.Name, user)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -78,7 +78,7 @@ func UpdateTopic(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM topics WHERE id = $1`, id).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -104,7 +104,7 @@ func UpdateTopic(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`UPDATE topics SET name = ? WHERE id = ?`, in.Name, id); err != nil {
+		if _, err := db.Exec(`UPDATE topics SET name = $1 WHERE id = $2`, in.Name, id); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -126,7 +126,7 @@ func DeleteTopic(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM topics WHERE id = ?`, id).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM topics WHERE id = $1`, id).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -139,7 +139,7 @@ func DeleteTopic(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`DELETE FROM topics WHERE id = ?`, id); err != nil {
+		if _, err := db.Exec(`DELETE FROM topics WHERE id = $1`, id); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

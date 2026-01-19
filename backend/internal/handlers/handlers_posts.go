@@ -19,7 +19,7 @@ func ListPosts(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.Query(`SELECT id, topic_id, title, content, author, created_at FROM posts WHERE topic_id = ? ORDER BY id DESC`, topicID)
+		rows, err := db.Query(`SELECT id, topic_id, title, content, author, created_at FROM posts WHERE topic_id = $1 ORDER BY id DESC`, topicID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -68,7 +68,7 @@ func CreatePost(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec(`INSERT INTO posts(topic_id, title, content, author) VALUES (?, ?, ?, ?)`, topicID, in.Title, in.Content, user)
+		res, err := db.Exec(`INSERT INTO posts(topic_id, title, content, author) VALUES ($1, $1, $1, $1)`, topicID, in.Title, in.Content, user)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
@@ -87,7 +87,7 @@ func GetPost(db *sql.DB) http.HandlerFunc {
 		}
 
 		var p models.Post
-		err = db.QueryRow(`SELECT id, topic_id, title, content, author, created_at FROM posts WHERE id = ?`, postID).
+		err = db.QueryRow(`SELECT id, topic_id, title, content, author, created_at FROM posts WHERE id = $1`, postID).
 			Scan(&p.ID, &p.TopicID, &p.Title, &p.Content, &p.Author, &p.CreatedAt)
 		if err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
@@ -115,7 +115,7 @@ func UpdatePost(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM posts WHERE id = $1`, postID).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -143,7 +143,7 @@ func UpdatePost(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`UPDATE posts SET title = ?, content = ? WHERE id = ?`, in.Title, in.Content, postID); err != nil {
+		if _, err := db.Exec(`UPDATE posts SET title = $1, content = $2 WHERE id = $3`, in.Title, in.Content, postID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -165,7 +165,7 @@ func DeletePost(db *sql.DB) http.HandlerFunc {
 		}
 
 		var owner string
-		if err := db.QueryRow(`SELECT author FROM posts WHERE id = ?`, postID).Scan(&owner); err != nil {
+		if err := db.QueryRow(`SELECT author FROM posts WHERE id = $1`, postID).Scan(&owner); err != nil {
 			if api.ErrorsIs(err, sql.ErrNoRows) {
 				http.Error(w, "not found", 404)
 				return
@@ -178,7 +178,7 @@ func DeletePost(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.Exec(`DELETE FROM posts WHERE id = ?`, postID); err != nil {
+		if _, err := db.Exec(`DELETE FROM posts WHERE id = $1`, postID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
