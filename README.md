@@ -96,6 +96,14 @@ The frontend runs at:
 http://localhost:5173
 ```
 
+## Deployed Application
+
+You can access to the application through:
+
+```
+https://final-forum.vercel.app/
+```
+
 ---
 
 ## API Overview (Backend)
@@ -153,7 +161,7 @@ This project is intended to practice:
 
 ---
 
-### AI Usage Declaration
+## AI Usage Declaration
 
 This project made limited use of AI tools as a learning and support resource.
 
