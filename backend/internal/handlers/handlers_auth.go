@@ -20,31 +20,48 @@ func Register(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+
 		in.Username = strings.TrimSpace(in.Username)
-		if in.Username == "" || len(in.Password) < 6 {
-			http.Error(w, "invalid username or password", 400)
+		if in.Username == "" || in.Password == "" {
+			http.Error(w, "username and password required", 400)
+			return
+		}
+		var exists int
+		err := db.QueryRow(
+			"SELECT COUNT(*) FROM users WHERE username = $1",
+			in.Username,
+		).Scan(&exists)
+		if err != nil {
+			http.Error(w, "db error", 500)
+			return
+		}
+		if exists > 0 {
+			http.Error(w, "username already exists", 400)
 			return
 		}
 
 		hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, "hash error", 500)
 			return
 		}
 
-		if _, err := db.Exec(`INSERT INTO users(username, password_hash) VALUES (?, ?)`, in.Username, string(hash)); err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") &&
-				strings.Contains(err.Error(), "users.username") {
-				http.Error(w, "username already taken", 400)
-				return
-			}
-			http.Error(w, "failed to register", 400)
+		_, err = db.Exec(
+			"INSERT INTO users (username, password_hash) VALUES ($1, $2)",
+			in.Username,
+			string(hash),
+		)
+		if err != nil {
+			http.Error(w, "insert failed", 500)
 			return
 		}
 
-		w.WriteHeader(201)
+		api.WriteJSON(w, 201, map[string]string{
+			"message": "registered",
+		})
 	}
 }
+
 
 func Login(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
