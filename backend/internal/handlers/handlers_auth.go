@@ -93,37 +93,24 @@ func Login(db *sql.DB) http.HandlerFunc {
 		}
 		router.SetSession(sid, in.Username)
 
-		secure := false
-		if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-			secure = true
-		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session",
-			Value:    sid,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: http.SameSiteNoneMode,
+		api.WriteJSON(w, 200, map[string]string{
+			"token":    sid,
+			"username": in.Username,
 		})
-		w.WriteHeader(204)
 	}
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
-	c, err := r.Cookie("session")
-	if err == nil {
-		router.DeleteSession(c.Value)
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	if auth != "" {
+		parts := strings.SplitN(auth, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(strings.TrimSpace(parts[0]), "bearer") {
+			tok := strings.TrimSpace(parts[1])
+			if tok != "" {
+				router.DeleteSession(tok)
+			}
+		}
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
 	w.WriteHeader(204)
 }
 

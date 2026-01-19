@@ -14,7 +14,7 @@ func WithCORS(next http.Handler) http.Handler {
 			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 
 		if r.Method == "OPTIONS" {
@@ -52,11 +52,23 @@ func GetSessionUser(sid string) (string, bool) {
 }
 
 func CurrentUser(r *http.Request) (string, bool) {
-	c, err := r.Cookie("session")
-	if err != nil {
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	if auth == "" {
 		return "", false
 	}
-	return GetSessionUser(c.Value)
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parts[0]))
+	tok := strings.TrimSpace(parts[1])
+	if tok == "" {
+		return "", false
+	}
+	if scheme != "bearer" {
+		return "", false
+	}
+	return GetSessionUser(tok)
 }
 
 func MustUser(w http.ResponseWriter, r *http.Request) (string, bool) {

@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUsername(u ? u : null);
         } catch (e: any) {
             if (String(e?.message).includes("UNAUTHORIZED")) {
+                localStorage.removeItem("ff_token");
                 setUsername(null);
             } else {
                 setUsername(null);
