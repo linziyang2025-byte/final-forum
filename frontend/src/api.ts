@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";;
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE}${path}`;
@@ -14,14 +14,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (res.status === 204) return undefined as T;
 
     const text = await res.text();
-
     let data: any = null;
+
     if (text) {
         try {
             data = JSON.parse(text);
         } catch {
             data = text;
         }
+    }
+
+
+    if (res.status === 401) {
+        throw new Error("UNAUTHORIZED");
     }
 
     if (!res.ok) {
@@ -36,6 +41,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+    // auth
     me: () => request<{ username: string }>("/auth/me"),
     login: (username: string, password: string) =>
         request<void>("/auth/login", {
@@ -49,6 +55,7 @@ export const api = {
         }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
 
+    // topics
     listTopics: () => request<any[]>("/api/topics"),
     createTopic: (name: string) =>
         request("/api/topics", {
@@ -62,6 +69,7 @@ export const api = {
         }),
     deleteTopic: (id: number) => request(`/api/topics/${id}`, { method: "DELETE" }),
 
+    // posts
     listPosts: (topicID: number) => request<any[]>(`/api/topics/${topicID}/posts`),
     createPost: (topicID: number, title: string, content: string) =>
         request(`/api/topics/${topicID}/posts`, {
@@ -76,6 +84,7 @@ export const api = {
         }),
     deletePost: (postID: number) => request(`/api/posts/${postID}`, { method: "DELETE" }),
 
+    // comments
     listComments: (postID: number) => request<any[]>(`/api/posts/${postID}/comments`),
     createComment: (postID: number, content: string) =>
         request(`/api/posts/${postID}/comments`, {

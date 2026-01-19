@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { api } from "./api";
 
 type AuthState = {
@@ -18,17 +18,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function refresh() {
         try {
             const me = await api.me();
-            setUsername(me.username);
-        } catch {
-            setUsername(null);
+            const u = (me.username ?? "").trim();
+            setUsername(u ? u : null);
+        } catch (e: any) {
+            if (String(e?.message).includes("UNAUTHORIZED")) {
+                setUsername(null);
+            } else {
+                setUsername(null);
+            }
         } finally {
             setChecked(true);
         }
     }
 
     async function logout() {
-        await api.logout();
-        await refresh();
+        try {
+            await api.logout();
+        } finally {
+            await refresh();
+        }
     }
 
     useEffect(() => {
@@ -50,17 +58,13 @@ export function useAuth() {
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
     const { username, checked } = useAuth();
-    const nav = useNavigate();
     const loc = useLocation();
 
-    useEffect(() => {
-        if (!checked) return;
-        if (!username) {
-            nav("/login", { replace: true, state: { from: loc.pathname } });
-        }
-    }, [checked, username, nav, loc.pathname]);
-
     if (!checked) return <div className="page">Loading...</div>;
-    if (!username) return null; // 正在跳转
+
+    if (!username) {
+        return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+    }
+
     return <>{children}</>;
 }

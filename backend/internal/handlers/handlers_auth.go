@@ -127,13 +127,13 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-func AuthMe(w http.ResponseWriter, r *http.Request) {
-	u, ok := router.CurrentUser(r)
-	if !ok {
-		api.WriteJSON(w, 200, map[string]interface{}{"username": ""})
+func authMe(w http.ResponseWriter, r *http.Request) {
+	user, ok := router.CurrentUser(r)
+	if !ok || strings.TrimSpace(user) == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	api.WriteJSON(w, 200, map[string]interface{}{"username": u})
+	api.WriteJSON(w, http.StatusOK, map[string]string{"username": user})
 }
 
 func IsMe(w http.ResponseWriter, r *http.Request) {
