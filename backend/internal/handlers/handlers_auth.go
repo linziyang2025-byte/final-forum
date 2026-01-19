@@ -127,7 +127,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 
-func authMe(w http.ResponseWriter, r *http.Request) {
+func AuthMe(w http.ResponseWriter, r *http.Request) {
 	user, ok := router.CurrentUser(r)
 	if !ok || strings.TrimSpace(user) == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
