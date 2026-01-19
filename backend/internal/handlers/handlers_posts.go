@@ -68,7 +68,7 @@ func CreatePost(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.Exec(`INSERT INTO posts(topic_id, title, content, author) VALUES ($1, $1, $1, $1)`, topicID, in.Title, in.Content, user)
+		res, err := db.Exec(`INSERT INTO posts(topic_id, title, content, author) VALUES ($1, $2, $3, $4)`, topicID, in.Title, in.Content, user)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
