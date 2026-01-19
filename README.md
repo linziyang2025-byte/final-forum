@@ -150,3 +150,22 @@ This project is intended to practice:
 - Authentication and authorization
 - React frontend development
 - Full-stack integration
+
+---
+
+### AI Usage Declaration
+
+This project made limited use of AI tools as a learning and support resource.
+
+Specifically, AI assistance was used to:
+
+- Clarify concepts related to Go web development and HTTP request handling.
+
+- Suggest possible code structures and appropriate design patterns.
+
+- Provide guidance on debugging and improving code readability.
+
+- Help refine documentation and written explanations.
+
+All core system design, implementation, and final integration were completed by the author.
+AI tools were not used to automatically generate the complete solution, but were used to support understanding, problem-solving, and iterative improvement throughout the development process.

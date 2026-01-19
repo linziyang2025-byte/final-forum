@@ -5,26 +5,47 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func OpenDB(path string) *sql.DB {
-	db, err := sql.Open("sqlite3", path+"?_foreign_keys=on")
+func OpenDB() *sql.DB {
+	dsn := os.Getenv("DATABASE_URL")
+
+	var db *sql.DB
+	var err error
+
+	if dsn == "" {
+		db, err = sql.Open("sqlite3", "./forum.db?_foreign_keys=on")
+	} else {
+		db, err = sql.Open("postgres", dsn)
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := db.Ping(); err != nil {
+
+	if err = db.Ping(); err != nil {
 		log.Fatal(err)
 	}
+
 	return db
 }
 
-func ApplySchema(db *sql.DB, schemaPath string) {
-	b, err := os.ReadFile(schemaPath)
+func ApplySchema(db *sql.DB) {
+	var schema string
+	if os.Getenv("DATABASE_URL") == "" {
+		schema = "schema.sql"
+	} else {
+		schema = "schema_pg.sql"
+	}
+
+	b, err := os.ReadFile(schema)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := db.Exec(string(b)); err != nil {
+
+	if _, err = db.Exec(string(b)); err != nil {
 		log.Fatal(err)
 	}
 }

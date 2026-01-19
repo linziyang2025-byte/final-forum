@@ -12,9 +12,9 @@ import (
 )
 
 func main() {
-	db := database.OpenDB("./forum.db")
+	db := database.OpenDB()
 	defer db.Close()
-	database.ApplySchema(db, "./schema.sql")
+	database.ApplySchema(db)
 
 	r := chi.NewRouter()
 	r.Use(router.WithCORS)
